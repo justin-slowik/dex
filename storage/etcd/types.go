@@ -154,6 +154,7 @@ type Claims struct {
 	EmailVerified bool     `json:"emailVerified"`
 	Groups        []string `json:"groups,omitempty"`
 	Locale        string   `json:"locale,omitempty"`
+	ZoneInfo      string   `json:"zoneinfo,omitempty"`
 }
 
 func fromStorageClaims(i storage.Claims) Claims {
@@ -164,6 +165,7 @@ func fromStorageClaims(i storage.Claims) Claims {
 		EmailVerified: i.EmailVerified,
 		Groups:        i.Groups,
 		Locale:        i.Locale,
+		ZoneInfo:      i.ZoneInfo,
 	}
 }
 
@@ -175,6 +177,7 @@ func toStorageClaims(i Claims) storage.Claims {
 		EmailVerified: i.EmailVerified,
 		Groups:        i.Groups,
 		Locale:        i.Locale,
+		ZoneInfo:      i.ZoneInfo,
 	}
 }
 

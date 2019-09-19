@@ -174,7 +174,7 @@ func (s *Server) discoveryHandler() (http.HandlerFunc, error) {
 		AuthMethods: []string{"client_secret_basic"},
 		Claims: []string{
 			"aud", "email", "email_verified", "exp",
-			"iat", "iss", "locale", "name", "sub",
+			"iat", "iss", "locale", "zoneinfo", "name", "sub",
 		},
 	}
 
@@ -485,6 +485,7 @@ func (s *Server) finalizeLogin(identity connector.Identity, authReq storage.Auth
 		EmailVerified: identity.EmailVerified,
 		Groups:        identity.Groups,
 		Locale:        identity.Locale,
+		ZoneInfo:      identity.ZoneInfo,
 	}
 
 	updater := func(a storage.AuthRequest) (storage.AuthRequest, error) {
@@ -976,6 +977,7 @@ func (s *Server) handleRefreshToken(w http.ResponseWriter, r *http.Request, clie
 		Groups:        refresh.Claims.Groups,
 		ConnectorData: refresh.ConnectorData,
 		Locale:        refresh.Claims.Locale,
+		ZoneInfo:      refresh.Claims.ZoneInfo,
 	}
 
 	// Can the connector refresh the identity? If so, attempt to refresh the data
@@ -1000,6 +1002,7 @@ func (s *Server) handleRefreshToken(w http.ResponseWriter, r *http.Request, clie
 		EmailVerified: ident.EmailVerified,
 		Groups:        ident.Groups,
 		Locale:        ident.Locale,
+		ZoneInfo:      ident.ZoneInfo,
 	}
 
 	accessToken, err := s.newAccessToken(client.ID, claims, scopes, refresh.Nonce, refresh.ConnectorID)

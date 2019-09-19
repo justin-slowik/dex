@@ -202,4 +202,16 @@ var migrations = []migration{
 				add column claims_locale text;`,
 		},
 	},
+	{
+		stmts: []string{`
+			alter table auth_request
+				add column claims_zoneinfo text;`,
+			`
+			alter table auth_code
+				add column claims_zoneinfo text;`,
+			`
+			alter table refresh_token
+				add column claims_zoneinfo text;`,
+		},
+	},
 }

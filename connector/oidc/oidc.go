@@ -261,12 +261,15 @@ func (c *oidcConnector) HandleCallback(s connector.Scopes, r *http.Request) (ide
 
 	locale, _ := claims["locale"].(string)
 
+	zoneinfo, _ := claims["zoneinfo"].(string)
+
 	identity = connector.Identity{
 		UserID:        idToken.Subject,
 		Username:      name,
 		Email:         email,
 		EmailVerified: emailVerified,
 		Locale:        locale,
+		ZoneInfo:      zoneinfo,
 	}
 
 	if c.userIDKey != "" {

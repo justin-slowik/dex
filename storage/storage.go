@@ -143,6 +143,7 @@ type Claims struct {
 	EmailVerified bool
 	Groups        []string
 	Locale        string
+	ZoneInfo      string
 }
 
 // AuthRequest represents a OAuth2 client authorization request. It holds the state
