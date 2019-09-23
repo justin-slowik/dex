@@ -650,13 +650,13 @@ func scanPassword(s scanner) (p storage.Password, err error) {
 func (c *conn) CreateOfflineSessions(s storage.OfflineSessions) error {
 	_, err := c.Exec(`
 		insert into offline_session (
-			user_id, conn_id, refresh
+			user_id, conn_id, refresh, connector_data
 		)
 		values (
-			$1, $2, $3
+			$1, $2, $3, $4
 		);
 	`,
-		s.UserID, s.ConnID, encoder(s.Refresh),
+		s.UserID, s.ConnID, encoder(s.Refresh), s.ConnectorData,
 	)
 	if err != nil {
 		if c.alreadyExistsCheck(err) {
@@ -681,10 +681,11 @@ func (c *conn) UpdateOfflineSessions(userID string, connID string, updater func(
 		_, err = tx.Exec(`
 			update offline_session
 			set
-				refresh = $1
-			where user_id = $2 AND conn_id = $3;
+				refresh = $1,
+				connector_data = $2
+			where user_id = $3 AND conn_id = $4;
 		`,
-			encoder(newSession.Refresh), s.UserID, s.ConnID,
+			encoder(newSession.Refresh), newSession.ConnectorData, s.UserID, s.ConnID,
 		)
 		if err != nil {
 			return fmt.Errorf("update offline session: %v", err)
@@ -700,7 +701,7 @@ func (c *conn) GetOfflineSessions(userID string, connID string) (storage.Offline
 func getOfflineSessions(q querier, userID string, connID string) (storage.OfflineSessions, error) {
 	return scanOfflineSessions(q.QueryRow(`
 		select
-			user_id, conn_id, refresh
+			user_id, conn_id, refresh, connector_data
 		from offline_session
 		where user_id = $1 AND conn_id = $2;
 		`, userID, connID))
@@ -708,7 +709,7 @@ func getOfflineSessions(q querier, userID string, connID string) (storage.Offlin
 
 func scanOfflineSessions(s scanner) (o storage.OfflineSessions, err error) {
 	err = s.Scan(
-		&o.UserID, &o.ConnID, decoder(&o.Refresh),
+		&o.UserID, &o.ConnID, decoder(&o.Refresh), &o.ConnectorData,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

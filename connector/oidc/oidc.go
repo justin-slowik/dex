@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
@@ -167,14 +168,19 @@ func (c *oidcConnector) LoginURL(s connector.Scopes, callbackURL, state string) 
 		return "", fmt.Errorf("expected callback URL %q did not match the URL in the config %q", callbackURL, c.redirectURI)
 	}
 
+	var opts []oauth2.AuthCodeOption
 	if len(c.hostedDomains) > 0 {
 		preferredDomain := c.hostedDomains[0]
 		if len(c.hostedDomains) > 1 {
 			preferredDomain = "*"
 		}
-		return c.oauth2Config.AuthCodeURL(state, oauth2.SetAuthURLParam("hd", preferredDomain)), nil
+		//return c.oauth2Config.AuthCodeURL(state, oauth2.SetAuthURLParam("hd", preferredDomain)), nil
+		opts = append(opts, oauth2.SetAuthURLParam("hd", preferredDomain))
 	}
-	return c.oauth2Config.AuthCodeURL(state), nil
+	if s.OfflineAccess {
+		opts = append(opts, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent"))
+	}
+	return c.oauth2Config.AuthCodeURL(state, opts...), nil
 }
 
 type oauth2Error struct {
@@ -199,11 +205,15 @@ func (c *oidcConnector) HandleCallback(s connector.Scopes, r *http.Request) (ide
 		return identity, fmt.Errorf("oidc: failed to get token: %v", err)
 	}
 
+	return c.createIdentity(r.Context(), identity, token)
+}
+
+func (c *oidcConnector) createIdentity(ctx context.Context, identity connector.Identity, token *oauth2.Token) (connector.Identity, error) {
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
 		return identity, errors.New("oidc: no id_token in token response")
 	}
-	idToken, err := c.verifier.Verify(r.Context(), rawIDToken)
+	idToken, err := c.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		return identity, fmt.Errorf("oidc: failed to verify ID Token: %v", err)
 	}
@@ -250,7 +260,7 @@ func (c *oidcConnector) HandleCallback(s connector.Scopes, r *http.Request) (ide
 	}
 
 	if c.getUserInfo {
-		userInfo, err := c.provider.UserInfo(r.Context(), oauth2.StaticTokenSource(token))
+		userInfo, err := c.provider.UserInfo(ctx, oauth2.StaticTokenSource(token))
 		if err != nil {
 			return identity, fmt.Errorf("oidc: error loading userinfo: %v", err)
 		}
@@ -270,6 +280,7 @@ func (c *oidcConnector) HandleCallback(s connector.Scopes, r *http.Request) (ide
 		EmailVerified: emailVerified,
 		Locale:        locale,
 		ZoneInfo:      zoneinfo,
+		ConnectorData: []byte(token.RefreshToken),
 	}
 
 	if c.userIDKey != "" {
@@ -285,5 +296,14 @@ func (c *oidcConnector) HandleCallback(s connector.Scopes, r *http.Request) (ide
 
 // Refresh is implemented for backwards compatibility, even though it's a no-op.
 func (c *oidcConnector) Refresh(ctx context.Context, s connector.Scopes, identity connector.Identity) (connector.Identity, error) {
-	return identity, nil
+	t := &oauth2.Token{
+		RefreshToken: string(identity.ConnectorData),
+		Expiry:       time.Now().Add(-time.Hour),
+	}
+	token, err := c.oauth2Config.TokenSource(ctx, t).Token()
+	if err != nil {
+		return identity, fmt.Errorf("oidc: failed to get token: %v", err)
+	}
+
+	return c.createIdentity(ctx, identity, token)
 }

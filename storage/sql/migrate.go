@@ -214,4 +214,10 @@ var migrations = []migration{
 				add column claims_zoneinfo text;`,
 		},
 	},
+	{
+		stmts: []string{`
+			alter table offline_session
+				add column connector_data bytea not null default '';`,
+		},
+	},
 }
