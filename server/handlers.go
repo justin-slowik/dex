@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -1217,9 +1216,9 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		err := r.ParseForm()
 		if err != nil {
-			message := "Could not parse Device Request body"
-			s.logger.Errorf("%s : %v", message, err)
-			respondWithError(w, message, err)
+			message := fmt.Sprintf("Could not parse Device Request body: %v", err)
+			s.logger.Errorf(message)
+			s.tokenErrHelper(w, errInvalidRequest, message, http.StatusBadRequest)
 			return
 		}
 
@@ -1252,24 +1251,23 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.storage.CreateDeviceRequest(deviceReq); err != nil {
-			message := fmt.Sprintf("Failed to store device request %v", err)
-			s.logger.Errorf(message)
-			respondWithError(w, message, err)
+			message := fmt.Sprintf("Failed to store device request; %v", err)
+			s.logger.Error(message)
+			s.tokenErrHelper(w, errServerError, message, http.StatusInternalServerError)
 			return
 		}
 
 		//Store the device token
 		deviceToken := storage.DeviceToken{
 			DeviceCode: deviceCode,
-			Status:     "pending",
-			Token:      "",
+			Status:     deviceTokenPending,
 			Expiry:     expireTime,
 		}
 
 		if err := s.storage.CreateDeviceToken(deviceToken); err != nil {
 			message := fmt.Sprintf("Failed to store device token %v", err)
-			s.logger.Errorf(message)
-			respondWithError(w, message, err)
+			s.logger.Error("Failed to create authorization request: %v", err)
+			s.tokenErrHelper(w, errServerError, message, http.StatusInternalServerError)
 			return
 		}
 
@@ -1286,20 +1284,55 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		enc.Encode(code)
 
 	default:
-		s.renderError(r, w, http.StatusBadRequest, "Requested resource does not exist.")
+		s.renderError(r, w, http.StatusBadRequest, "Invalid device code request type")
+		s.tokenErrHelper(w, errInvalidRequest, "Invalid device code request type", http.StatusBadRequest)
 	}
 }
 
-func respondWithError(w io.Writer, errorMessage string, err error) {
-	resp := struct {
-		Error        string `json:"error"`
-		ErrorMessage string `json:"message"`
-	}{
-		Error:        err.Error(),
-		ErrorMessage: errorMessage,
-	}
+func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	switch r.Method {
+	case http.MethodPost:
+		err := r.ParseForm()
+		if err != nil {
+			message := "Could not parse Device Token Request body"
+			s.logger.Warnf("%s : %v", message, err)
+			s.tokenErrHelper(w, errInvalidRequest, message, http.StatusBadRequest)
+			return
+		}
 
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "   ")
-	enc.Encode(resp)
+		deviceCode := r.Form.Get("device_code")
+		if deviceCode == "" {
+			message := "No device code received"
+			s.tokenErrHelper(w, errInvalidRequest, message, http.StatusBadRequest)
+			return
+		}
+
+		grantType := r.PostFormValue("grant_type")
+		if grantType != grantTypeDeviceCode {
+			s.tokenErrHelper(w, errInvalidGrant, "Unsupported grant type.  Must be device_code", http.StatusBadRequest)
+			return
+		}
+
+		//Grab the device token from the db
+		deviceToken, err := s.storage.GetDeviceToken(deviceCode)
+		if err != nil || s.now().After(deviceToken.Expiry) {
+			if err != storage.ErrNotFound {
+				s.logger.Errorf("failed to get device code: %v", err)
+				s.tokenErrHelper(w, errServerError, "Device code not found", http.StatusInternalServerError)
+			} else {
+				s.tokenErrHelper(w, errInvalidRequest, "Invalid or expired device code parameter.", http.StatusBadRequest)
+			}
+			return
+		}
+
+		switch deviceToken.Status {
+		case deviceTokenPending:
+			s.tokenErrHelper(w, deviceTokenPending, "", http.StatusUnauthorized)
+		case deviceTokenComplete:
+			w.Write([]byte(deviceToken.Token))
+		}
+	default:
+		s.renderError(r, w, http.StatusBadRequest, "Requested resource does not exist.")
+	}
 }

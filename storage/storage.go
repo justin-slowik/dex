@@ -79,6 +79,7 @@ type Storage interface {
 	GetPassword(email string) (Password, error)
 	GetOfflineSessions(userID string, connID string) (OfflineSessions, error)
 	GetConnector(id string) (Connector, error)
+	GetDeviceToken(deviceCode string) (DeviceToken, error)
 
 	ListClients() ([]Client, error)
 	ListRefreshTokens() ([]RefreshToken, error)

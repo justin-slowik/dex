@@ -892,9 +892,9 @@ func testGC(t *testing.T, s storage.Storage) {
 				t.Errorf("expected no device token garbage collection results, got %#v", result)
 			}
 		}
-		//if _, err := s.GetDeviceRequest(d.UserCode); err != nil {
-		//	t.Errorf("expected to be able to get auth request after GC: %v", err)
-		//}
+		if _, err := s.GetDeviceToken(dt.DeviceCode); err != nil {
+			t.Errorf("expected to be able to get device token after GC: %v", err)
+		}
 	}
 	if r, err := s.GarbageCollect(expiry.Add(time.Hour)); err != nil {
 		t.Errorf("garbage collection failed: %v", err)
@@ -902,12 +902,11 @@ func testGC(t *testing.T, s storage.Storage) {
 		t.Errorf("expected to garbage collect 1 device token, got %d", r.DeviceTokens)
 	}
 
-	//TODO add this code back once Getters are written for device tokens
-	//if _, err := s.GetDeviceRequest(d.UserCode); err == nil {
-	//	t.Errorf("expected device request to be GC'd")
-	//} else if err != storage.ErrNotFound {
-	//	t.Errorf("expected storage.ErrNotFound, got %v", err)
-	//}
+	if _, err := s.GetDeviceToken(dt.DeviceCode); err == nil {
+		t.Errorf("expected device token to be GC'd")
+	} else if err != storage.ErrNotFound {
+		t.Errorf("expected storage.ErrNotFound, got %v", err)
+	}
 }
 
 // testTimezones tests that backends either fully support timezones or
