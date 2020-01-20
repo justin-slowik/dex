@@ -254,3 +254,12 @@ func fromStorageDeviceToken(t storage.DeviceToken) DeviceToken {
 		Expiry:     t.Expiry,
 	}
 }
+
+func toStorageDeviceToken(t DeviceToken) storage.DeviceToken {
+	return storage.DeviceToken{
+		DeviceCode: t.DeviceCode,
+		Status:     t.Status,
+		Token:      t.Token,
+		Expiry:     t.Expiry,
+	}
+}

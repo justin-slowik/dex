@@ -286,8 +286,11 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	handleWithCORS("/userinfo", s.handleUserInfo)
 	handleFunc("/auth", s.handleAuthorization)
 	handleFunc("/auth/{connector}", s.handleConnectorLogin)
+	handleFunc("/device", s.handleDeviceExchange)
+	handleFunc("/device/auth/verify_code", s.verifyUserCode)
 	handleFunc("/device/code", s.handleDeviceCode)
 	handleFunc("/device/token", s.handleDeviceToken)
+	handleFunc("/device/callback", s.handleDeviceCallback)
 	r.HandleFunc(path.Join(issuerURL.Path, "/callback"), func(w http.ResponseWriter, r *http.Request) {
 		// Strip the X-Remote-* headers to prevent security issues on
 		// misconfigured authproxy connector setups.

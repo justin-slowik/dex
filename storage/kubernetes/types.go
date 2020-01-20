@@ -707,6 +707,17 @@ func (cli *client) fromStorageDeviceRequest(a storage.DeviceRequest) DeviceReque
 	return req
 }
 
+func toStorageDeviceRequest(req DeviceRequest) storage.DeviceRequest {
+	return storage.DeviceRequest{
+		UserCode:     req.ObjectMeta.Name,
+		DeviceCode:   req.DeviceCode,
+		ClientID:     req.CLientID,
+		Scopes:       req.Scopes,
+		PkceVerifier: req.PkceVerifier,
+		Expiry:       req.Expiry,
+	}
+}
+
 // DeviceToken is a mirrored struct from storage with JSON struct tags and
 // Kubernetes type metadata.
 type DeviceToken struct {

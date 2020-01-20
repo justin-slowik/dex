@@ -923,6 +923,28 @@ func (c *conn) CreateDeviceToken(t storage.DeviceToken) error {
 	return nil
 }
 
+func (c *conn) GetDeviceRequest(userCode string) (storage.DeviceRequest, error) {
+	return getDeviceRequest(c, userCode)
+}
+
+func getDeviceRequest(q querier, userCode string) (d storage.DeviceRequest, err error) {
+	err = q.QueryRow(`
+		select
+            device_code, client_id, scopes, pkce_verifier, expiry
+		from device_request where user_code = $1;
+	`, userCode).Scan(
+		&d.DeviceCode, &d.ClientID, decoder(&d.Scopes), &d.PkceVerifier, &d.Expiry,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return d, storage.ErrNotFound
+		}
+		return d, fmt.Errorf("select device token: %v", err)
+	}
+	d.UserCode = userCode
+	return d, nil
+}
+
 func (c *conn) GetDeviceToken(deviceCode string) (storage.DeviceToken, error) {
 	return getDeviceToken(c, deviceCode)
 }
@@ -943,4 +965,30 @@ func getDeviceToken(q querier, deviceCode string) (a storage.DeviceToken, err er
 	}
 	a.DeviceCode = deviceCode
 	return a, nil
+}
+
+func (c *conn) UpdateDeviceToken(deviceCode string, updater func(old storage.DeviceToken) (storage.DeviceToken, error)) error {
+	return c.ExecTx(func(tx *trans) error {
+		r, err := getDeviceToken(tx, deviceCode)
+		if err != nil {
+			return err
+		}
+		if r, err = updater(r); err != nil {
+			return err
+		}
+		_, err = tx.Exec(`
+			update device_token
+			set
+				status = $1, 
+				token = $2 
+			where
+				device_code = $3
+		`,
+			r.Status, r.Token, r.DeviceCode,
+		)
+		if err != nil {
+			return fmt.Errorf("update device token: %v", err)
+		}
+		return nil
+	})
 }
