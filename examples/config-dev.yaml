@@ -34,76 +34,41 @@ telemetry:
 
 # Uncomment this block to enable configuration for the expiration time durations.
 # expiry:
+#   deviceRequests: "5m"
 #   signingKeys: "6h"
 #   idTokens: "24h"
-#   deviceRequests: "24h"
 
 # Options for controlling the logger.
 # logger:
 #   level: "debug"
 #   format: "text" # can also be "json"
 
-# Uncomment this block to control which response types dex supports. For example
-# the following response types enable the implicit flow for web-only clients.
-# Defaults to ["code"], the code flow.
-oauth2:
-  responseTypes: ["code", "token", "id_token"]
+# Default values shown below
+# oauth2:
+    # use ["code", "token", "id_token"] to enable implicit flow for web-only clients
+#   responseTypes: [ "code" ] # also allowed are "token" and "id_token"
+    # By default, Dex will ask for approval to share data with application
+    # (approval for sharing data from connected IdP to Dex is separate process on IdP)
+#   skipApprovalScreen: false
+    # If only one authentication method is enabled, the default behavior is to
+    # go directly to it. For connected IdPs, this redirects the browser away
+    # from application to upstream provider such as the Google login page
+#   alwaysShowLoginScreen: false
 
 # Instead of reading from an external storage, use this list of clients.
 #
 # If this option isn't chosen clients may be added through the gRPC API.
 staticClients:
-  - id: example-app
-    redirectURIs:
-      - 'http://127.0.0.1:5555/callback'
-      - https://www.getpostman.com/oauth2/callback
-      - http://localhost:8080/auth/redirect
-      - /dex/device/callback
-    name: 'Platform X'
-    secret: ZXhhbXBsZS1hcHAtc2VjcmV0
+- id: example-app
+  redirectURIs:
+  - 'http://127.0.0.1:5555/callback'
+  name: 'Example App'
+  secret: ZXhhbXBsZS1hcHAtc2VjcmV0
 
 connectors:
-  -
-    type: oidc
-    id: okta
-    name: okta
-    config:
-      issuer: https://dev-141342.okta.com/oauth2/default
-      # Connector config values starting with a "$" will read from the environment.
-      clientID: 0oauqjf6dYIbwxntp356
-      clientSecret: ytHDykxKBvBY25yvVmKJQ9JhQelbUgi_oxVpdZ-J
-      redirectURI: http://127.0.0.1:5556/dex/callback
-      # List of additional scopes to request in token response
-      # Default is profile and email
-      # Full list at https://github.com/dexidp/dex/blob/master/Documentation/custom-scopes-claims-clients.md
-      scopes:
-        - openid
-        - email
-        - profile
-        - offline_access
-      # The set claim is used as user id.
-      # Default: sub
-      # Claims list at https://openid.net/specs/openid-connect-core-1_0.html#Claims
-      #
-      userIDKey: sub
-
-      # The set claim is used as user name.
-      # Default: name
-      userNameKey: name
-
-      # Some providers return claims without "email_verified", when they had no usage of emails verification in enrollement process
-      # or if they are acting as a proxy for another IDP etc AWS Cognito with an upstream SAML IDP
-      # This can be overridden with the below option
-      insecureSkipEmailVerified: true
-
-      # When enabled, the OpenID Connector will query the UserInfo endpoint for additional claims. UserInfo claims
-      # take priority over claims returned by the IDToken. This option should be used when the IDToken doesn't contain
-      # all the claims requested.
-      # https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
-      getUserInfo: true
-#- type: mockCallback
-#  id: mock
-#  name: Example
+- type: mockCallback
+  id: mock
+  name: Example
 # - type: oidc
 #   id: google
 #   name: Google
@@ -119,12 +84,13 @@ connectors:
 # Let dex keep a list of passwords which can be used to login to dex.
 enablePasswordDB: true
 
-  # A static list of passwords to login the end user. By identifying here, dex
-  # won't look in its underlying storage for passwords.
-  #
+# A static list of passwords to login the end user. By identifying here, dex
+# won't look in its underlying storage for passwords.
+#
 # If this option isn't chosen users may be added through the gRPC API.
 staticPasswords:
-  - email: "admin@example.com"
-    hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
-    username: "admin"
-    userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"
+- email: "admin@example.com"
+  # bcrypt hash of the string "password"
+  hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+  username: "admin"
+  userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"

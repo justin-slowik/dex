@@ -74,7 +74,11 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		deviceCode := storage.NewDeviceCode()
 
 		//make user code
-		userCode := storage.NewUserCode()
+		userCode, err := storage.NewUserCode()
+		if err != nil {
+			s.logger.Errorf("Error generating user code: %v", err)
+			s.tokenErrHelper(w, errServerError, "Could not generate user code", http.StatusInternalServerError)
+		}
 
 		//Generate the expire time
 		//expireTime := time.Now().Add(time.Second * time.Duration(expireIntervalSeconds))
@@ -241,7 +245,7 @@ func (s *Server) handleDeviceCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//Grab the device request from the db
+		//Grab the device request from storage
 		deviceReq, err := s.storage.GetDeviceRequest(userCode)
 		if err != nil || s.now().After(deviceReq.Expiry) {
 			if err != storage.ErrNotFound {
@@ -265,7 +269,7 @@ func (s *Server) handleDeviceCallback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//Grab the device request from the db
+		//Grab the device request from storage
 		old, err := s.storage.GetDeviceToken(deviceReq.DeviceCode)
 		if err != nil || s.now().After(old.Expiry) {
 			if err != storage.ErrNotFound {

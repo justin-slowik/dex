@@ -121,7 +121,7 @@ const (
 const (
 	grantTypeAuthorizationCode = "authorization_code"
 	grantTypeRefreshToken      = "refresh_token"
-	grantTypeDeviceCode        = "device_code"
+	grantTypeDeviceCode        = "urn:ietf:params:oauth:grant-type:device_code"
 )
 
 const (

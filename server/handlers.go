@@ -147,30 +147,34 @@ func (s *Server) handlePublicKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 type discovery struct {
-	Issuer        string   `json:"issuer"`
-	Auth          string   `json:"authorization_endpoint"`
-	Token         string   `json:"token_endpoint"`
-	Keys          string   `json:"jwks_uri"`
-	UserInfo      string   `json:"userinfo_endpoint"`
-	ResponseTypes []string `json:"response_types_supported"`
-	Subjects      []string `json:"subject_types_supported"`
-	IDTokenAlgs   []string `json:"id_token_signing_alg_values_supported"`
-	Scopes        []string `json:"scopes_supported"`
-	AuthMethods   []string `json:"token_endpoint_auth_methods_supported"`
-	Claims        []string `json:"claims_supported"`
+	Issuer         string   `json:"issuer"`
+	Auth           string   `json:"authorization_endpoint"`
+	Token          string   `json:"token_endpoint"`
+	Keys           string   `json:"jwks_uri"`
+	UserInfo       string   `json:"userinfo_endpoint"`
+	DeviceEndpoint string   `json:"device_authorization_endpoint"`
+	GrantTypes     []string `json:"grant_types_supported"'`
+	ResponseTypes  []string `json:"response_types_supported"`
+	Subjects       []string `json:"subject_types_supported"`
+	IDTokenAlgs    []string `json:"id_token_signing_alg_values_supported"`
+	Scopes         []string `json:"scopes_supported"`
+	AuthMethods    []string `json:"token_endpoint_auth_methods_supported"`
+	Claims         []string `json:"claims_supported"`
 }
 
 func (s *Server) discoveryHandler() (http.HandlerFunc, error) {
 	d := discovery{
-		Issuer:      s.issuerURL.String(),
-		Auth:        s.absURL("/auth"),
-		Token:       s.absURL("/token"),
-		Keys:        s.absURL("/keys"),
-		UserInfo:    s.absURL("/userinfo"),
-		Subjects:    []string{"public"},
-		IDTokenAlgs: []string{string(jose.RS256)},
-		Scopes:      []string{"openid", "email", "groups", "profile", "offline_access"},
-		AuthMethods: []string{"client_secret_basic"},
+		Issuer:         s.issuerURL.String(),
+		Auth:           s.absURL("/auth"),
+		Token:          s.absURL("/token"),
+		Keys:           s.absURL("/keys"),
+		UserInfo:       s.absURL("/userinfo"),
+		DeviceEndpoint: s.absURL("/device/code"),
+		Subjects:       []string{"public"},
+		GrantTypes:     []string{grantTypeAuthorizationCode, grantTypeRefreshToken, grantTypeDeviceCode},
+		IDTokenAlgs:    []string{string(jose.RS256)},
+		Scopes:         []string{"openid", "email", "groups", "profile", "offline_access"},
+		AuthMethods:    []string{"client_secret_basic"},
 		Claims: []string{
 			"aud", "email", "email_verified", "exp",
 			"iat", "iss", "locale", "name", "sub",
