@@ -907,12 +907,12 @@ func (c *conn) CreateDeviceRequest(d storage.DeviceRequest) error {
 func (c *conn) CreateDeviceToken(t storage.DeviceToken) error {
 	_, err := c.Exec(`
 		insert into device_token (
-			device_code, status, token, expiry
+			device_code, status, token, expiry, last_request, poll_interval
 		)
 		values (
-			$1, $2, $3, $4
+			$1, $2, $3, $4, $5, $6
 		);`,
-		t.DeviceCode, t.Status, t.Token, t.Expiry,
+		t.DeviceCode, t.Status, t.Token, t.Expiry, t.LastRequestTime, t.PollIntervalSeconds,
 	)
 	if err != nil {
 		if c.alreadyExistsCheck(err) {
@@ -952,10 +952,10 @@ func (c *conn) GetDeviceToken(deviceCode string) (storage.DeviceToken, error) {
 func getDeviceToken(q querier, deviceCode string) (a storage.DeviceToken, err error) {
 	err = q.QueryRow(`
 		select
-            status, token, expiry
+            status, token, expiry, last_request, poll_interval
 		from device_token where device_code = $1;
 	`, deviceCode).Scan(
-		&a.Status, &a.Token, &a.Expiry,
+		&a.Status, &a.Token, &a.Expiry, &a.LastRequestTime, &a.PollIntervalSeconds,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -980,11 +980,13 @@ func (c *conn) UpdateDeviceToken(deviceCode string, updater func(old storage.Dev
 			update device_token
 			set
 				status = $1, 
-				token = $2 
+				token = $2,
+				last_request = $3,
+				poll_interval = $4
 			where
-				device_code = $3
+				device_code = $5
 		`,
-			r.Status, r.Token, r.DeviceCode,
+			r.Status, r.Token, r.LastRequestTime, r.PollIntervalSeconds, r.DeviceCode,
 		)
 		if err != nil {
 			return fmt.Errorf("update device token: %v", err)

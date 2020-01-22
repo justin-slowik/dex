@@ -394,8 +394,10 @@ type DeviceRequest struct {
 }
 
 type DeviceToken struct {
-	DeviceCode string
-	Status     string
-	Token      string
-	Expiry     time.Time
+	DeviceCode          string
+	Status              string
+	Token               string
+	Expiry              time.Time
+	LastRequestTime     time.Time
+	PollIntervalSeconds int
 }

@@ -721,9 +721,11 @@ type DeviceToken struct {
 	k8sapi.TypeMeta   `json:",inline"`
 	k8sapi.ObjectMeta `json:"metadata,omitempty"`
 
-	Status string    `json:"status,omitempty"`
-	Token  string    `json:"token,omitempty"`
-	Expiry time.Time `json:"expiry"`
+	Status              string    `json:"status,omitempty"`
+	Token               string    `json:"token,omitempty"`
+	Expiry              time.Time `json:"expiry"`
+	LastRequestTime     time.Time `json:"last_request"`
+	PollIntervalSeconds int       `json:"poll_interval"`
 }
 
 // DeviceTokenList is a list of DeviceTokens.
@@ -743,18 +745,22 @@ func (cli *client) fromStorageDeviceToken(t storage.DeviceToken) DeviceToken {
 			Name:      t.DeviceCode,
 			Namespace: cli.namespace,
 		},
-		Status: t.Status,
-		Token:  t.Token,
-		Expiry: t.Expiry,
+		Status:              t.Status,
+		Token:               t.Token,
+		Expiry:              t.Expiry,
+		LastRequestTime:     t.LastRequestTime,
+		PollIntervalSeconds: t.PollIntervalSeconds,
 	}
 	return req
 }
 
 func toStorageDeviceToken(t DeviceToken) storage.DeviceToken {
 	return storage.DeviceToken{
-		DeviceCode: t.ObjectMeta.Name,
-		Status:     t.Status,
-		Token:      t.Token,
-		Expiry:     t.Expiry,
+		DeviceCode:          t.ObjectMeta.Name,
+		Status:              t.Status,
+		Token:               t.Token,
+		Expiry:              t.Expiry,
+		LastRequestTime:     t.LastRequestTime,
+		PollIntervalSeconds: t.PollIntervalSeconds,
 	}
 }

@@ -987,10 +987,12 @@ func testDeviceRequestCRUD(t *testing.T, s storage.Storage) {
 func testDeviceTokenCRUD(t *testing.T, s storage.Storage) {
 	//Create a Token
 	d1 := storage.DeviceToken{
-		DeviceCode: storage.NewID(),
-		Status:     "pending",
-		Token:      storage.NewID(),
-		Expiry:     neverExpire,
+		DeviceCode:          storage.NewID(),
+		Status:              "pending",
+		Token:               storage.NewID(),
+		Expiry:              neverExpire,
+		LastRequestTime:     time.Now(),
+		PollIntervalSeconds: 0,
 	}
 
 	if err := s.CreateDeviceToken(d1); err != nil {

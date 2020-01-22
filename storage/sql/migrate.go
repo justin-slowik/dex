@@ -223,7 +223,9 @@ var migrations = []migration{
 				device_code text not null primary key,
 				status text not null,
 				token text,
-				expiry timestamptz not null
+				expiry timestamptz not null,
+				last_request timestamptz not null,
+                poll_interval integer not null
 			);`,
 		},
 	},

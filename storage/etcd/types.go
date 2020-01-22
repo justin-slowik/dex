@@ -238,26 +238,32 @@ func fromStorageDeviceRequest(d storage.DeviceRequest) DeviceRequest {
 
 // DeviceToken is a mirrored struct from storage with JSON struct tags
 type DeviceToken struct {
-	DeviceCode string    `json:"device_code"`
-	Status     string    `json:"status"`
-	Token      string    `json:"token"`
-	Expiry     time.Time `json:"expiry"`
+	DeviceCode          string    `json:"device_code"`
+	Status              string    `json:"status"`
+	Token               string    `json:"token"`
+	Expiry              time.Time `json:"expiry"`
+	LastRequestTime     time.Time `json:"last_request"`
+	PollIntervalSeconds int       `json:"poll_interval"`
 }
 
 func fromStorageDeviceToken(t storage.DeviceToken) DeviceToken {
 	return DeviceToken{
-		DeviceCode: t.DeviceCode,
-		Status:     t.Status,
-		Token:      t.Token,
-		Expiry:     t.Expiry,
+		DeviceCode:          t.DeviceCode,
+		Status:              t.Status,
+		Token:               t.Token,
+		Expiry:              t.Expiry,
+		LastRequestTime:     t.LastRequestTime,
+		PollIntervalSeconds: t.PollIntervalSeconds,
 	}
 }
 
 func toStorageDeviceToken(t DeviceToken) storage.DeviceToken {
 	return storage.DeviceToken{
-		DeviceCode: t.DeviceCode,
-		Status:     t.Status,
-		Token:      t.Token,
-		Expiry:     t.Expiry,
+		DeviceCode:          t.DeviceCode,
+		Status:              t.Status,
+		Token:               t.Token,
+		Expiry:              t.Expiry,
+		LastRequestTime:     t.LastRequestTime,
+		PollIntervalSeconds: t.PollIntervalSeconds,
 	}
 }
