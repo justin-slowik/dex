@@ -21,10 +21,16 @@ type deviceCodeResponse struct {
 	UserCode string `json:"user_code"`
 	//The url to verify the user code.
 	VerificationURI string `json:"verification_uri"`
+	//The verification uri with the user code appended for pre-filling form
+	VerificationURIComplete string `json:"verification_uri_complete"`
 	//The lifetime of the device code
 	ExpireTime int `json:"expires_in"`
 	//How often the device is allowed to poll to verify that the user login occurred
 	PollInterval int `json:"interval"`
+}
+
+func (s *Server) getDeviceAuthURI() string {
+	return path.Join(s.issuerURL.Path, "/device/auth/verify_code")
 }
 
 func (s *Server) handleDeviceExchange(w http.ResponseWriter, r *http.Request) {
@@ -35,8 +41,7 @@ func (s *Server) handleDeviceExchange(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			invalidAttempt = false
 		}
-		verifyURL := path.Join(s.issuerURL.Path, "/device/auth/verify_code")
-		if err := s.templates.device(r, w, verifyURL, userCode, invalidAttempt); err != nil {
+		if err := s.templates.device(r, w, s.getDeviceAuthURI(), userCode, invalidAttempt); err != nil {
 			s.logger.Errorf("Server template error: %v", err)
 		}
 	default:
@@ -46,7 +51,7 @@ func (s *Server) handleDeviceExchange(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 	//TODO replace with configurable values
-	expireIntervalSeconds := 300
+	//expireIntervalSeconds := s.deviceRequestsValidFor
 	pollIntervalSeconds := 5
 
 	switch r.Method {
@@ -72,7 +77,8 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		userCode := storage.NewUserCode()
 
 		//Generate the expire time
-		expireTime := time.Now().Add(time.Second * time.Duration(expireIntervalSeconds))
+		//expireTime := time.Now().Add(time.Second * time.Duration(expireIntervalSeconds))
+		expireTime := time.Now().Add(s.deviceRequestsValidFor)
 
 		//Store the Device Request
 		deviceReq := storage.DeviceRequest{
@@ -104,12 +110,27 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		u, err := url.Parse(s.issuerURL.String())
+		if err != nil {
+			s.logger.Errorf("Could not parse issuer URL %v", err)
+			s.renderError(r, w, http.StatusInternalServerError, "")
+			return
+		}
+		u.Path = path.Join(u.Path, "device")
+		vURI := u.String()
+
+		q := u.Query()
+		q.Set("user_code", userCode)
+		u.RawQuery = q.Encode()
+		vURIComplete := u.String()
+
 		code := deviceCodeResponse{
-			DeviceCode:      deviceCode,
-			UserCode:        userCode,
-			VerificationURI: path.Join(s.issuerURL.String(), "/device"),
-			ExpireTime:      expireIntervalSeconds,
-			PollInterval:    pollIntervalSeconds,
+			DeviceCode:              deviceCode,
+			UserCode:                userCode,
+			VerificationURI:         vURI,
+			VerificationURIComplete: vURIComplete,
+			ExpireTime:              int(s.deviceRequestsValidFor.Seconds()),
+			PollInterval:            pollIntervalSeconds,
 		}
 
 		enc := json.NewEncoder(w)
@@ -166,6 +187,7 @@ func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
 		minRequestTime := deviceToken.LastRequestTime.Add(time.Second * time.Duration(pollInterval))
 		if now.Before(minRequestTime) {
 			s.tokenErrHelper(w, deviceTokenSlowDown, "", http.StatusBadRequest)
+			//Continually increase the poll interval until the user waits the proper time
 			pollInterval += 5
 		} else {
 			pollInterval = 5
@@ -306,10 +328,15 @@ func (s *Server) verifyUserCode(w http.ResponseWriter, r *http.Request) {
 		userCode = strings.ToUpper(userCode)
 
 		//Find the user code in the available requests
-		//Grab the device token from the db
 		deviceRequest, err := s.storage.GetDeviceRequest(userCode)
 		if err != nil || s.now().After(deviceRequest.Expiry) {
-			s.renderError(r, w, http.StatusBadRequest, "Invalid or expired user code")
+			if err != storage.ErrNotFound {
+				s.logger.Errorf("failed to get device request: %v", err)
+				s.tokenErrHelper(w, errServerError, "", http.StatusInternalServerError)
+			}
+			if err := s.templates.device(r, w, s.getDeviceAuthURI(), userCode, true); err != nil {
+				s.logger.Errorf("Server template error: %v", err)
+			}
 			return
 		}
 
