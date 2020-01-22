@@ -389,8 +389,6 @@ type DeviceRequest struct {
 	ClientID string
 	//The scopes the device requests
 	Scopes []string
-	//PKCE Verification
-	PkceVerifier string
 	//The expire time
 	Expiry time.Time
 }

@@ -1208,4 +1208,3 @@ func usernamePrompt(conn connector.PasswordConnector) string {
 	}
 	return "Username"
 }
-

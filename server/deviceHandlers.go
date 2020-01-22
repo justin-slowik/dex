@@ -71,20 +71,16 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		//make user code
 		userCode := storage.NewUserCode()
 
-		//make a pkce verification code
-		pkceCode := storage.NewID()
-
 		//Generate the expire time
 		expireTime := time.Now().Add(time.Second * time.Duration(expireIntervalSeconds))
 
 		//Store the Device Request
 		deviceReq := storage.DeviceRequest{
-			UserCode:     userCode,
-			DeviceCode:   deviceCode,
-			ClientID:     clientID,
-			Scopes:       scopes,
-			PkceVerifier: pkceCode,
-			Expiry:       expireTime,
+			UserCode:   userCode,
+			DeviceCode: deviceCode,
+			ClientID:   clientID,
+			Scopes:     scopes,
+			Expiry:     expireTime,
 		}
 
 		if err := s.storage.CreateDeviceRequest(deviceReq); err != nil {

@@ -216,7 +216,6 @@ var migrations = []migration{
 				device_code text not null,
 				client_id text not null,
 				scopes bytea not null, -- JSON array of strings
-				pkce_verifier text not null,
 				expiry timestamptz not null
 			);`,
 			`

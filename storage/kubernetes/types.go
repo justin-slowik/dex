@@ -674,11 +674,10 @@ type DeviceRequest struct {
 	k8sapi.TypeMeta   `json:",inline"`
 	k8sapi.ObjectMeta `json:"metadata,omitempty"`
 
-	DeviceCode   string    `json:"device_code,omitempty"`
-	CLientID     string    `json:"client_id,omitempty"`
-	Scopes       []string  `json:"scopes,omitempty"`
-	PkceVerifier string    `json:"pkce_verifier,omitempty"`
-	Expiry       time.Time `json:"expiry"`
+	DeviceCode string    `json:"device_code,omitempty"`
+	CLientID   string    `json:"client_id,omitempty"`
+	Scopes     []string  `json:"scopes,omitempty"`
+	Expiry     time.Time `json:"expiry"`
 }
 
 // AuthRequestList is a list of AuthRequests.
@@ -698,23 +697,21 @@ func (cli *client) fromStorageDeviceRequest(a storage.DeviceRequest) DeviceReque
 			Name:      strings.ToLower(a.UserCode),
 			Namespace: cli.namespace,
 		},
-		DeviceCode:   a.DeviceCode,
-		CLientID:     a.ClientID,
-		Scopes:       a.Scopes,
-		PkceVerifier: a.PkceVerifier,
-		Expiry:       a.Expiry,
+		DeviceCode: a.DeviceCode,
+		CLientID:   a.ClientID,
+		Scopes:     a.Scopes,
+		Expiry:     a.Expiry,
 	}
 	return req
 }
 
 func toStorageDeviceRequest(req DeviceRequest) storage.DeviceRequest {
 	return storage.DeviceRequest{
-		UserCode:     req.ObjectMeta.Name,
-		DeviceCode:   req.DeviceCode,
-		ClientID:     req.CLientID,
-		Scopes:       req.Scopes,
-		PkceVerifier: req.PkceVerifier,
-		Expiry:       req.Expiry,
+		UserCode:   req.ObjectMeta.Name,
+		DeviceCode: req.DeviceCode,
+		ClientID:   req.CLientID,
+		Scopes:     req.Scopes,
+		Expiry:     req.Expiry,
 	}
 }
 

@@ -839,12 +839,11 @@ func testGC(t *testing.T, s storage.Storage) {
 	}
 
 	d := storage.DeviceRequest{
-		UserCode:     userCode,
-		DeviceCode:   storage.NewID(),
-		ClientID:     "client1",
-		Scopes:       []string{"openid", "email"},
-		PkceVerifier: storage.NewID(),
-		Expiry:       expiry,
+		UserCode:   userCode,
+		DeviceCode: storage.NewID(),
+		ClientID:   "client1",
+		Scopes:     []string{"openid", "email"},
+		Expiry:     expiry,
 	}
 
 	if err := s.CreateDeviceRequest(d); err != nil {
@@ -966,12 +965,11 @@ func testDeviceRequestCRUD(t *testing.T, s storage.Storage) {
 		panic(err)
 	}
 	d1 := storage.DeviceRequest{
-		UserCode:     userCode,
-		DeviceCode:   storage.NewID(),
-		ClientID:     "client1",
-		Scopes:       []string{"openid", "email"},
-		PkceVerifier: storage.NewID(),
-		Expiry:       neverExpire,
+		UserCode:   userCode,
+		DeviceCode: storage.NewID(),
+		ClientID:   "client1",
+		Scopes:     []string{"openid", "email"},
+		Expiry:     neverExpire,
 	}
 
 	if err := s.CreateDeviceRequest(d1); err != nil {
