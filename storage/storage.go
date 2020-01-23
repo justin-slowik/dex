@@ -5,7 +5,6 @@ import (
 	"encoding/base32"
 	"errors"
 	"io"
-	mrand "math/rand"
 	"strings"
 	"time"
 
@@ -24,6 +23,9 @@ var (
 //
 // TODO(ericchiang): refactor ID creation onto the storage.
 var encoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567")
+
+//Valid characters for user codes
+const validUserCharacters = "BCDFGHJKLMNPQRSTVWXZ"
 
 // NewDeviceCode returns a 32 char alphanumeric cryptographically secure string
 func NewDeviceCode() string {
@@ -353,18 +355,34 @@ type Keys struct {
 	NextRotation time.Time
 }
 
-func NewUserCode() string {
-	mrand.Seed(time.Now().UnixNano())
-	return randomString(4) + "-" + randomString(4)
+func NewUserCode() (string, error) {
+	code, err := randomString(8)
+	if err != nil {
+		return "", err
+	}
+	return code[:4] + "-" + code[4:], nil
 }
 
-func randomString(n int) string {
-	var letter = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letter[mrand.Intn(len(letter))]
+//returns a securely generated random string.
+func randomString(n int) (string, error) {
+	bytes, err := generateRandomBytes(n)
+	if err != nil {
+		return "", err
 	}
-	return string(b)
+	for i, b := range bytes {
+		bytes[i] = validUserCharacters[b%byte(len(validUserCharacters))]
+	}
+	return string(bytes), nil
+}
+
+//returns securely generated random bytes.
+func generateRandomBytes(n int) ([]byte, error) {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 //DeviceRequest represents an OIDC device authorization request.  It holds the state of a device request until the user

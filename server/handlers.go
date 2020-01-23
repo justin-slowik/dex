@@ -1232,7 +1232,11 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		deviceCode := storage.NewDeviceCode()
 
 		//make user code
-		userCode := storage.NewUserCode()
+		userCode, err := storage.NewUserCode()
+		if err != nil {
+			s.logger.Errorf("Error generating user code: %v", err)
+			s.tokenErrHelper(w, errServerError, "Could not generate user code", http.StatusInternalServerError)
+		}
 
 		//make a pkce verification code
 		pkceCode := storage.NewID()
