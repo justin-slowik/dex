@@ -1216,9 +1216,8 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		err := r.ParseForm()
 		if err != nil {
-			message := fmt.Sprintf("Could not parse Device Request body: %v", err)
-			s.logger.Errorf(message)
-			s.tokenErrHelper(w, errInvalidRequest, message, http.StatusBadRequest)
+			s.logger.Errorf("Could not parse Device Request body: %v", err)
+			s.tokenErrHelper(w, errInvalidRequest, "", http.StatusNotFound)
 			return
 		}
 
@@ -1235,7 +1234,7 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		userCode, err := storage.NewUserCode()
 		if err != nil {
 			s.logger.Errorf("Error generating user code: %v", err)
-			s.tokenErrHelper(w, errServerError, "Could not generate user code", http.StatusInternalServerError)
+			s.tokenErrHelper(w, errInvalidRequest, "", http.StatusInternalServerError)
 		}
 
 		//make a pkce verification code
@@ -1255,9 +1254,8 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.storage.CreateDeviceRequest(deviceReq); err != nil {
-			message := fmt.Sprintf("Failed to store device request; %v", err)
-			s.logger.Error(message)
-			s.tokenErrHelper(w, errServerError, message, http.StatusInternalServerError)
+			s.logger.Errorf("Failed to store device request; %v", err)
+			s.tokenErrHelper(w, errInvalidRequest, "", http.StatusInternalServerError)
 			return
 		}
 
@@ -1269,9 +1267,8 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.storage.CreateDeviceToken(deviceToken); err != nil {
-			message := fmt.Sprintf("Failed to store device token %v", err)
-			s.logger.Error("Failed to create authorization request: %v", err)
-			s.tokenErrHelper(w, errServerError, message, http.StatusInternalServerError)
+			s.logger.Errorf("Failed to store device token %v", err)
+			s.tokenErrHelper(w, errInvalidRequest, "", http.StatusInternalServerError)
 			return
 		}
 
@@ -1289,7 +1286,7 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		s.renderError(r, w, http.StatusBadRequest, "Invalid device code request type")
-		s.tokenErrHelper(w, errInvalidRequest, "Invalid device code request type", http.StatusBadRequest)
+		s.tokenErrHelper(w, errInvalidRequest, "", http.StatusBadRequest)
 	}
 }
 
@@ -1301,7 +1298,7 @@ func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			message := "Could not parse Device Token Request body"
 			s.logger.Warnf("%s : %v", message, err)
-			s.tokenErrHelper(w, errInvalidRequest, message, http.StatusBadRequest)
+			s.tokenErrHelper(w, errInvalidRequest, "", http.StatusBadRequest)
 			return
 		}
 
@@ -1314,7 +1311,7 @@ func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
 
 		grantType := r.PostFormValue("grant_type")
 		if grantType != grantTypeDeviceCode {
-			s.tokenErrHelper(w, errInvalidGrant, "Unsupported grant type.  Must be device_code", http.StatusBadRequest)
+			s.tokenErrHelper(w, errInvalidGrant, "", http.StatusBadRequest)
 			return
 		}
 
@@ -1323,10 +1320,8 @@ func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
 		if err != nil || s.now().After(deviceToken.Expiry) {
 			if err != storage.ErrNotFound {
 				s.logger.Errorf("failed to get device code: %v", err)
-				s.tokenErrHelper(w, errServerError, "Device code not found", http.StatusInternalServerError)
-			} else {
-				s.tokenErrHelper(w, errInvalidRequest, "Invalid or expired device code parameter.", http.StatusBadRequest)
 			}
+			s.tokenErrHelper(w, errInvalidRequest, "Invalid or expired device code.", http.StatusBadRequest)
 			return
 		}
 
