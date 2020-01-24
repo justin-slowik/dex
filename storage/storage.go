@@ -5,6 +5,7 @@ import (
 	"encoding/base32"
 	"errors"
 	"io"
+	"math/big"
 	"strings"
 	"time"
 
@@ -355,6 +356,8 @@ type Keys struct {
 	NextRotation time.Time
 }
 
+// NewUserCode returns a randomized 8 character user code for the device flow.
+// No vowels are included to prevent accidental generation of words
 func NewUserCode() (string, error) {
 	code, err := randomString(8)
 	if err != nil {
@@ -363,26 +366,14 @@ func NewUserCode() (string, error) {
 	return code[:4] + "-" + code[4:], nil
 }
 
-//returns a securely generated random string.
 func randomString(n int) (string, error) {
-	bytes, err := generateRandomBytes(n)
-	if err != nil {
-		return "", err
-	}
-	for i, b := range bytes {
-		bytes[i] = validUserCharacters[b%byte(len(validUserCharacters))]
+	v := big.NewInt(int64(len(validUserCharacters)))
+	bytes := make([]byte, n)
+	for i := 0; i < n; i++ {
+		c, _ := rand.Int(rand.Reader, v)
+		bytes[i] = validUserCharacters[c.Int64()]
 	}
 	return string(bytes), nil
-}
-
-//returns securely generated random bytes.
-func generateRandomBytes(n int) ([]byte, error) {
-	b := make([]byte, n)
-	_, err := rand.Read(b)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
 }
 
 //DeviceRequest represents an OIDC device authorization request.  It holds the state of a device request until the user
