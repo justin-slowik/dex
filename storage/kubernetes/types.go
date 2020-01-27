@@ -707,7 +707,7 @@ func (cli *client) fromStorageDeviceRequest(a storage.DeviceRequest) DeviceReque
 
 func toStorageDeviceRequest(req DeviceRequest) storage.DeviceRequest {
 	return storage.DeviceRequest{
-		UserCode:   req.ObjectMeta.Name,
+		UserCode:   strings.ToUpper(req.ObjectMeta.Name),
 		DeviceCode: req.DeviceCode,
 		ClientID:   req.CLientID,
 		Scopes:     req.Scopes,

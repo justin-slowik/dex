@@ -640,7 +640,7 @@ func (cli *client) CreateDeviceRequest(d storage.DeviceRequest) error {
 
 func (cli *client) GetDeviceRequest(userCode string) (storage.DeviceRequest, error) {
 	var req DeviceRequest
-	if err := cli.get(resourceDeviceRequest, userCode, &req); err != nil {
+	if err := cli.get(resourceDeviceRequest, strings.ToLower(userCode), &req); err != nil {
 		return storage.DeviceRequest{}, err
 	}
 	return toStorageDeviceRequest(req), nil
