@@ -121,7 +121,7 @@ const (
 const (
 	grantTypeAuthorizationCode = "authorization_code"
 	grantTypeRefreshToken      = "refresh_token"
-	grantTypeDeviceCode        = "device_code"
+	grantTypeDeviceCode        = "urn:ietf:params:oauth:grant-type:device_code"
 )
 
 const (
@@ -133,6 +133,8 @@ const (
 const (
 	deviceTokenPending  = "authorization_pending"
 	deviceTokenComplete = "complete"
+	deviceTokenSlowDown = "slow_down"
+	deviceTokenExpired  = "expired_token"
 )
 
 func parseScopes(scopes []string) connector.Scopes {
