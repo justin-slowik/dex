@@ -877,12 +877,10 @@ func testGC(t *testing.T, s storage.Storage) {
 	}
 
 	dt := storage.DeviceToken{
-		DeviceCode:          storage.NewID(),
-		Status:              "pending",
-		Token:               "foo",
-		Expiry:              expiry,
-		LastRequestTime:     time.Now(),
-		PollIntervalSeconds: 0,
+		DeviceCode: storage.NewID(),
+		Status:     "pending",
+		Token:      "foo",
+		Expiry:     expiry,
 	}
 
 	if err := s.CreateDeviceToken(dt); err != nil {
@@ -910,6 +908,42 @@ func testGC(t *testing.T, s storage.Storage) {
 
 	if _, err := s.GetDeviceToken(dt.DeviceCode); err == nil {
 		t.Errorf("expected device token to be GC'd")
+	} else if err != storage.ErrNotFound {
+		t.Errorf("expected storage.ErrNotFound, got %v", err)
+	}
+
+	r := storage.RequestLimit{
+		Key:      "POST-127.0.0.1",
+		Interval: 5,
+		Expiry:   expiry,
+		LastSeen: time.Now(),
+	}
+
+	if err := s.CreateRequestLimit(r); err != nil {
+		t.Fatalf("failed creating request limit: %v", err)
+	}
+
+	for _, tz := range []*time.Location{time.UTC, est, pst} {
+		result, err := s.GarbageCollect(expiry.Add(-time.Hour).In(tz))
+		if err != nil {
+			t.Errorf("garbage collection failed: %v", err)
+		} else {
+			if result.RequestLimits != 0 {
+				t.Errorf("expected no request limit garbage collection results, got %#v", result)
+			}
+		}
+		if _, err := s.GetRequestLimit(r.Key); err != nil {
+			t.Errorf("expected to be able to get request limit after GC: %v", err)
+		}
+	}
+	if r, err := s.GarbageCollect(expiry.Add(time.Hour)); err != nil {
+		t.Errorf("garbage collection failed: %v", err)
+	} else if r.RequestLimits != 1 {
+		t.Errorf("expected to garbage collect 1 request limit, got %d", r.RequestLimits)
+	}
+
+	if _, err := s.GetRequestLimit(r.Key); err == nil {
+		t.Errorf("expected request limit to be GC'd")
 	} else if err != storage.ErrNotFound {
 		t.Errorf("expected storage.ErrNotFound, got %v", err)
 	}
@@ -990,12 +1024,10 @@ func testDeviceRequestCRUD(t *testing.T, s storage.Storage) {
 func testDeviceTokenCRUD(t *testing.T, s storage.Storage) {
 	//Create a Token
 	d1 := storage.DeviceToken{
-		DeviceCode:          storage.NewID(),
-		Status:              "pending",
-		Token:               storage.NewID(),
-		Expiry:              neverExpire,
-		LastRequestTime:     time.Now(),
-		PollIntervalSeconds: 0,
+		DeviceCode: storage.NewID(),
+		Status:     "pending",
+		Token:      storage.NewID(),
+		Expiry:     neverExpire,
 	}
 
 	if err := s.CreateDeviceToken(d1); err != nil {

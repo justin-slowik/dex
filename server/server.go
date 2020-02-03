@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -13,6 +14,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/dexidp/dex/server/limiter"
 
 	"github.com/felixge/httpsnoop"
 	"github.com/gorilla/handlers"
@@ -263,6 +266,9 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	handleFunc := func(p string, h http.HandlerFunc) {
 		handle(p, h)
 	}
+	handleWithRateLimit := func(p string, h http.HandlerFunc, requestInterval time.Duration, onLimitReached func(w http.ResponseWriter, r *http.Request, delaySeconds int)) {
+		handle(p, s.RequestLimitFuncHandler(s.makeLimiter(requestInterval, onLimitReached), h))
+	}
 	handlePrefix := func(p string, h http.Handler) {
 		prefix := path.Join(issuerURL.Path, p)
 		r.PathPrefix(prefix).Handler(http.StripPrefix(prefix, h))
@@ -290,9 +296,9 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	handleFunc("/auth", s.handleAuthorization)
 	handleFunc("/auth/{connector}", s.handleConnectorLogin)
 	handleFunc("/device", s.handleDeviceExchange)
-	handleFunc("/device/auth/verify_code", s.verifyUserCode)
-	handleFunc("/device/code", s.handleDeviceCode)
-	handleFunc("/device/token", s.handleDeviceToken)
+	handleWithRateLimit("/device/auth/verify_code", s.verifyUserCode, 1*time.Second, s.renderRateLimitHTML)
+	handleWithRateLimit("/device/token", s.handleDeviceToken, 5*time.Second, s.renderRateLimitJSON)
+	handleWithRateLimit("/device/code", s.handleDeviceCode, 5*time.Second, s.renderRateLimitJSON)
 	handleFunc("/device/callback", s.handleDeviceCallback)
 	r.HandleFunc(path.Join(issuerURL.Path, "/callback"), func(w http.ResponseWriter, r *http.Request) {
 		// Strip the X-Remote-* headers to prevent security issues on
@@ -551,4 +557,62 @@ func (s *Server) getConnector(id string) (Connector, error) {
 	}
 
 	return conn, nil
+}
+
+func (s *Server) makeLimiter(requestInterval time.Duration, onLimitReached func(w http.ResponseWriter, r *http.Request, delaySeconds int)) *limiter.RequestLimiter {
+	lmt := s.NewLimiter(requestInterval, 1*time.Hour, true)
+	lmt.SetOnLimitReached(onLimitReached)
+	return lmt
+}
+
+// GetIP finds the IP Address given http.Request struct.
+func GetIP(r *http.Request) string {
+	realIP := r.Header.Get("X-Real-IP")
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	ipLookups := []string{"RemoteAddr", "X-Forwarded-For", "X-Real-IP"}
+	for _, lookup := range ipLookups {
+		if lookup == "RemoteAddr" && r.RemoteAddr != "" {
+			// 1. Cover the basic use cases for both ipv4 and ipv6
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				// 2. Upon error, just return the remote addr.
+				return r.RemoteAddr
+			}
+			return ip
+		}
+		if lookup == "X-Forwarded-For" && forwardedFor != "" {
+			// X-Forwarded-For is potentially a list of addresses separated with ","
+			parts := strings.Split(forwardedFor, ",")
+			for i, p := range parts {
+				parts[i] = strings.TrimSpace(p)
+			}
+
+			partIndex := len(parts) - 1
+			if partIndex < 0 {
+				partIndex = 0
+			}
+
+			return parts[partIndex]
+		}
+		if lookup == "X-Real-IP" && realIP != "" {
+			return realIP
+		}
+	}
+	return ""
+}
+
+// renderRateLimitJSON is a method which runs when a request is rate limited, and returns a JSON-based error message
+func (s *Server) renderRateLimitJSON(w http.ResponseWriter, r *http.Request, delaySeconds int) {
+	s.logger.Warnf("User at IP %v was rate limited", GetIP(r))
+	desc := fmt.Sprintf("Wait %d seconds and try again", delaySeconds)
+	s.tokenErrHelper(w, deviceTokenSlowDown, desc, http.StatusTooManyRequests)
+}
+
+// renderRateLimitJSON is a method which runs when a request is rate limited, and returns a HTML-based error message
+func (s *Server) renderRateLimitHTML(w http.ResponseWriter, r *http.Request, delaySeconds int) {
+	s.logger.Warnf("User at IP %v was rate limited", GetIP(r))
+	desc := fmt.Sprintf("Wait %d seconds and try again", delaySeconds)
+	if err := s.templates.err(r, w, http.StatusTooManyRequests, desc); err != nil {
+		s.logger.Errorf("Server template error: %v", err)
+	}
 }

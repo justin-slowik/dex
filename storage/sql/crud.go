@@ -117,6 +117,14 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 		result.DeviceTokens = n
 	}
 
+	r, err = c.Exec(`delete from request_limit where expiry < $1`, now)
+	if err != nil {
+		return result, fmt.Errorf("gc device_token: %v", err)
+	}
+	if n, err := r.RowsAffected(); err == nil {
+		result.RequestLimits = n
+	}
+
 	return
 }
 
@@ -907,12 +915,31 @@ func (c *conn) CreateDeviceRequest(d storage.DeviceRequest) error {
 func (c *conn) CreateDeviceToken(t storage.DeviceToken) error {
 	_, err := c.Exec(`
 		insert into device_token (
-			device_code, status, token, expiry, last_request, poll_interval
+			device_code, status, token, expiry
 		)
 		values (
-			$1, $2, $3, $4, $5, $6
+			$1, $2, $3, $4
 		);`,
-		t.DeviceCode, t.Status, t.Token, t.Expiry, t.LastRequestTime, t.PollIntervalSeconds,
+		t.DeviceCode, t.Status, t.Token, t.Expiry,
+	)
+	if err != nil {
+		if c.alreadyExistsCheck(err) {
+			return storage.ErrAlreadyExists
+		}
+		return fmt.Errorf("insert device token: %v", err)
+	}
+	return nil
+}
+
+func (c *conn) CreateRequestLimit(r storage.RequestLimit) error {
+	_, err := c.Exec(`
+		insert into request_limit (
+			request_key, request_interval, last_seen, expiry
+		)
+		values (
+			$1, $2, $3, $4
+		);`,
+		r.Key, r.Interval, r.LastSeen, r.Expiry,
 	)
 	if err != nil {
 		if c.alreadyExistsCheck(err) {
@@ -952,10 +979,10 @@ func (c *conn) GetDeviceToken(deviceCode string) (storage.DeviceToken, error) {
 func getDeviceToken(q querier, deviceCode string) (a storage.DeviceToken, err error) {
 	err = q.QueryRow(`
 		select
-            status, token, expiry, last_request, poll_interval
+            status, token, expiry
 		from device_token where device_code = $1;
 	`, deviceCode).Scan(
-		&a.Status, &a.Token, &a.Expiry, &a.LastRequestTime, &a.PollIntervalSeconds,
+		&a.Status, &a.Token, &a.Expiry,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -965,6 +992,28 @@ func getDeviceToken(q querier, deviceCode string) (a storage.DeviceToken, err er
 	}
 	a.DeviceCode = deviceCode
 	return a, nil
+}
+
+func (c *conn) GetRequestLimit(key string) (storage.RequestLimit, error) {
+	return getRequestLimit(c, key)
+}
+
+func getRequestLimit(q querier, key string) (r storage.RequestLimit, err error) {
+	err = q.QueryRow(`
+		select
+			request_interval, last_seen, expiry 
+		from request_limit where request_key = $1;
+	`, key).Scan(
+		&r.Interval, &r.LastSeen, &r.Expiry,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return r, storage.ErrNotFound
+		}
+		return r, fmt.Errorf("select request limit: %v", err)
+	}
+	r.Key = key
+	return r, nil
 }
 
 func (c *conn) UpdateDeviceToken(deviceCode string, updater func(old storage.DeviceToken) (storage.DeviceToken, error)) error {
@@ -980,13 +1029,38 @@ func (c *conn) UpdateDeviceToken(deviceCode string, updater func(old storage.Dev
 			update device_token
 			set
 				status = $1, 
-				token = $2,
-				last_request = $3,
-				poll_interval = $4
+				token = $2
 			where
-				device_code = $5
+				device_code = $3
 		`,
-			r.Status, r.Token, r.LastRequestTime, r.PollIntervalSeconds, r.DeviceCode,
+			r.Status, r.Token, r.DeviceCode,
+		)
+		if err != nil {
+			return fmt.Errorf("update device token: %v", err)
+		}
+		return nil
+	})
+}
+
+func (c *conn) UpdateRequestLimit(key string, updater func(old storage.RequestLimit) (storage.RequestLimit, error)) error {
+	return c.ExecTx(func(tx *trans) error {
+		r, err := getRequestLimit(tx, key)
+		if err != nil {
+			return err
+		}
+		if r, err = updater(r); err != nil {
+			return err
+		}
+		_, err = tx.Exec(`
+			update request_limit
+			set
+				request_interval = $1, 
+				last_seen = $2,
+				expiry = $3 
+			where 
+				request_key = $4
+		`,
+			r.Interval, r.LastSeen, r.Expiry, r.Key,
 		)
 		if err != nil {
 			return fmt.Errorf("update device token: %v", err)

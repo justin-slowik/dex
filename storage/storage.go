@@ -53,6 +53,7 @@ type GCResult struct {
 	AuthCodes      int64
 	DeviceRequests int64
 	DeviceTokens   int64
+	RequestLimits  int64
 }
 
 // Storage is the storage interface used by the server. Implementations are
@@ -71,6 +72,7 @@ type Storage interface {
 	CreateConnector(c Connector) error
 	CreateDeviceRequest(d DeviceRequest) error
 	CreateDeviceToken(d DeviceToken) error
+	CreateRequestLimit(l RequestLimit) error
 
 	// TODO(ericchiang): return (T, bool, error) so we can indicate not found
 	// requests that way instead of using ErrNotFound.
@@ -84,6 +86,7 @@ type Storage interface {
 	GetConnector(id string) (Connector, error)
 	GetDeviceRequest(userCode string) (DeviceRequest, error)
 	GetDeviceToken(deviceCode string) (DeviceToken, error)
+	GetRequestLimit(key string) (RequestLimit, error)
 
 	ListClients() ([]Client, error)
 	ListRefreshTokens() ([]RefreshToken, error)
@@ -121,6 +124,7 @@ type Storage interface {
 	UpdateOfflineSessions(userID string, connID string, updater func(s OfflineSessions) (OfflineSessions, error)) error
 	UpdateConnector(id string, updater func(c Connector) (Connector, error)) error
 	UpdateDeviceToken(deviceCode string, updater func(t DeviceToken) (DeviceToken, error)) error
+	UpdateRequestLimit(key string, updater func(l RequestLimit) (RequestLimit, error)) error
 
 	// GarbageCollect deletes all expired AuthCodes,AuthRequests, DeviceRequests, and DeviceTokens.
 	GarbageCollect(now time.Time) (GCResult, error)
@@ -378,8 +382,8 @@ func randomString(n int) (string, error) {
 	return string(bytes), nil
 }
 
-//DeviceRequest represents an OIDC device authorization request.  It holds the state of a device request until the user
-//authenticates using their user code or the expiry time passes.
+// DeviceRequest represents an OIDC device authorization request.  It holds the state of a device request until the user
+// authenticates using their user code or the expiry time passes.
 type DeviceRequest struct {
 	//The code the user will enter in a browser
 	UserCode string
@@ -395,11 +399,20 @@ type DeviceRequest struct {
 	Expiry time.Time
 }
 
+// DeviceToken represents an access token that is generated for use by an external device.  It holds the token
+// for the length of the Expiry and then will be cleaned up whether or not the external device has claimed it.
 type DeviceToken struct {
-	DeviceCode          string
-	Status              string
-	Token               string
-	Expiry              time.Time
-	LastRequestTime     time.Time
-	PollIntervalSeconds int
+	DeviceCode string
+	Status     string
+	Token      string
+	Expiry     time.Time
+}
+
+// RequestLimit represents a user request that has been received by the service based on IP, path, and method.  It
+// Holds the current request interval if throttled, and will be cleaned up after a set period of not being seen
+type RequestLimit struct {
+	Key      string
+	Interval int
+	LastSeen time.Time
+	Expiry   time.Time
 }

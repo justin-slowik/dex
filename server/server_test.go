@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
@@ -1428,6 +1429,103 @@ func TestOAuth2DeviceFlow(t *testing.T) {
 			err = tc.handleToken(ctx, p, oauth2Config, token, conn)
 			if err != nil {
 				t.Errorf("%s: %v", tc.name, err)
+			}
+		}()
+	}
+}
+
+func TestServerRateLimiting(t *testing.T) {
+	t0 := time.Now()
+
+	now := func() time.Time { return t0 }
+
+	client := storage.Client{
+		ID:           "testclient",
+		Secret:       "",
+		RedirectURIs: []string{"/device/callback"},
+	}
+
+	tests := []struct {
+		testName              string
+		endpoint              string
+		initialResponseCode   int
+		requestDelays         []time.Duration
+		expectedResponseCodes []int
+		requestValues         url.Values
+	}{
+		{
+			testName:              "Rate Limiting of Code Endpoint",
+			endpoint:              "/device/code",
+			initialResponseCode:   http.StatusOK,
+			requestDelays:         []time.Duration{6 * time.Second, 500 * time.Millisecond, 11 * time.Second},
+			expectedResponseCodes: []int{http.StatusOK, http.StatusTooManyRequests, http.StatusOK},
+			requestValues: map[string][]string{
+				"client_id": {"testclient"},
+				"scope":     {"openid", "profile", "email", "offline_access"},
+			},
+		},
+		{
+			testName:              "Rate Limiting of Token Endpoint",
+			endpoint:              "/device/token",
+			initialResponseCode:   http.StatusBadRequest,
+			requestDelays:         []time.Duration{6 * time.Second, 500 * time.Millisecond, 11 * time.Second},
+			expectedResponseCodes: []int{http.StatusBadRequest, http.StatusTooManyRequests, http.StatusBadRequest},
+			requestValues: map[string][]string{
+				"grant_type":  {grantTypeDeviceCode},
+				"device_code": {"abcd1234"},
+			},
+		},
+		{
+			testName:              "Rate Limiting of Verify_Code Endpoint",
+			endpoint:              "/device/auth/verify_code",
+			initialResponseCode:   http.StatusBadRequest,
+			requestDelays:         []time.Duration{2 * time.Second, 500 * time.Millisecond, 5 * time.Second},
+			expectedResponseCodes: []int{http.StatusBadRequest, http.StatusTooManyRequests, http.StatusBadRequest},
+			requestValues: map[string][]string{
+				"user_code": {"AAAA-ZZZZ"},
+			},
+		},
+	}
+	for _, tc := range tests {
+		func() {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			// Setup a dex server.
+			httpServer, s := newTestServer(ctx, t, func(c *Config) {
+				c.Issuer = c.Issuer + "/non-root-path"
+				c.Now = now
+			})
+			defer httpServer.Close()
+
+			if err := s.storage.CreateClient(client); err != nil {
+				t.Fatalf("failed to create client: %v", err)
+			}
+
+			u, err := url.Parse(s.issuerURL.String())
+			if err != nil {
+				t.Errorf("Could not parse issuer URL %v", err)
+			}
+			u.Path = path.Join(u.Path, tc.endpoint)
+
+			data := tc.requestValues
+			req, _ := http.NewRequest("POST", u.String(), bytes.NewBufferString(data.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+			req.Header.Set("X-Real-IP", "127.0.0.1")
+			//Make the first basic request, expect full standard response
+			rr := httptest.NewRecorder()
+			s.ServeHTTP(rr, req)
+			if rr.Code != tc.initialResponseCode {
+				t.Errorf("Unexpected Response Type.  Expected %v got %v", tc.initialResponseCode, rr.Code)
+			}
+
+			for i, delay := range tc.requestDelays {
+				t0 = t0.Add(delay)
+				rr := httptest.NewRecorder()
+				s.ServeHTTP(rr, req)
+				if rr.Code != tc.expectedResponseCodes[i] {
+					t.Errorf("Unexpected Response Type.  Expected %v got %v", tc.expectedResponseCodes[i], rr.Code)
+				}
 			}
 		}()
 	}

@@ -34,6 +34,8 @@ func TestStorage(t *testing.T) {
 		t.Skip("control plane binaries are missing")
 	}
 
+	//os.Setenv("TEST_ASSET_KUBE_APISERVER","/Users/justin.slowik/Documents/Projects/go/src/dex-fork/bin/test/kube-apiserver")
+	//os.Setenv("TEST_ASSET_ETCD","/Users/justin.slowik/Documents/Projects/go/src/dex-fork/bin/test/etcd")
 	suite.Run(t, new(StorageTestSuite))
 }
 

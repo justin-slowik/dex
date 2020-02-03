@@ -22,6 +22,7 @@ func New(logger log.Logger) storage.Storage {
 		connectors:      make(map[string]storage.Connector),
 		deviceRequests:  make(map[string]storage.DeviceRequest),
 		deviceTokens:    make(map[string]storage.DeviceToken),
+		requestLimits:   make(map[string]storage.RequestLimit),
 		logger:          logger,
 	}
 }
@@ -50,6 +51,7 @@ type memStorage struct {
 	connectors      map[string]storage.Connector
 	deviceRequests  map[string]storage.DeviceRequest
 	deviceTokens    map[string]storage.DeviceToken
+	requestLimits   map[string]storage.RequestLimit
 
 	keys storage.Keys
 
@@ -93,6 +95,12 @@ func (s *memStorage) GarbageCollect(now time.Time) (result storage.GCResult, err
 			if now.After(a.Expiry) {
 				delete(s.deviceTokens, id)
 				result.DeviceTokens++
+			}
+		}
+		for id, a := range s.requestLimits {
+			if now.After(a.Expiry) {
+				delete(s.requestLimits, id)
+				result.RequestLimits++
 			}
 		}
 	})
@@ -535,6 +543,42 @@ func (s *memStorage) UpdateDeviceToken(deviceCode string, updater func(p storage
 		}
 		if r, err = updater(r); err == nil {
 			s.deviceTokens[deviceCode] = r
+		}
+	})
+	return
+}
+
+func (s *memStorage) CreateRequestLimit(r storage.RequestLimit) (err error) {
+	s.tx(func() {
+		if _, ok := s.requestLimits[r.Key]; ok {
+			err = storage.ErrAlreadyExists
+		} else {
+			s.requestLimits[r.Key] = r
+		}
+	})
+	return
+}
+
+func (s *memStorage) GetRequestLimit(key string) (r storage.RequestLimit, err error) {
+	s.tx(func() {
+		var ok bool
+		if r, ok = s.requestLimits[key]; !ok {
+			err = storage.ErrNotFound
+			return
+		}
+	})
+	return
+}
+
+func (s *memStorage) UpdateRequestLimit(key string, updater func(l storage.RequestLimit) (storage.RequestLimit, error)) (err error) {
+	s.tx(func() {
+		r, ok := s.requestLimits[key]
+		if !ok {
+			err = storage.ErrNotFound
+			return
+		}
+		if r, err = updater(r); err == nil {
+			s.requestLimits[key] = r
 		}
 	})
 	return

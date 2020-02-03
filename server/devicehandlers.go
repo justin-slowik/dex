@@ -100,11 +100,9 @@ func (s *Server) handleDeviceCode(w http.ResponseWriter, r *http.Request) {
 
 		//Store the device token
 		deviceToken := storage.DeviceToken{
-			DeviceCode:          deviceCode,
-			Status:              deviceTokenPending,
-			Expiry:              expireTime,
-			LastRequestTime:     s.now(),
-			PollIntervalSeconds: 0,
+			DeviceCode: deviceCode,
+			Status:     deviceTokenPending,
+			Expiry:     expireTime,
 		}
 
 		if err := s.storage.CreateDeviceToken(deviceToken); err != nil {
@@ -184,37 +182,12 @@ func (s *Server) handleDeviceToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//Rate Limiting check
-		slowDown := false
-		pollInterval := deviceToken.PollIntervalSeconds
-		minRequestTime := deviceToken.LastRequestTime.Add(time.Second * time.Duration(pollInterval))
-		if now.Before(minRequestTime) {
-			slowDown = true
-			//Continually increase the poll interval until the user waits the proper time
-			pollInterval += 5
-		} else {
-			pollInterval = 5
-		}
-
 		switch deviceToken.Status {
 		case deviceTokenPending:
-			updater := func(old storage.DeviceToken) (storage.DeviceToken, error) {
-				old.PollIntervalSeconds = pollInterval
-				old.LastRequestTime = now
-				return old, nil
-			}
-			// Update device token last request time in storage
-			if err := s.storage.UpdateDeviceToken(deviceCode, updater); err != nil {
-				s.logger.Errorf("failed to update device token: %v", err)
-				s.renderError(r, w, http.StatusInternalServerError, "")
-				return
-			}
-			if slowDown {
-				s.tokenErrHelper(w, deviceTokenSlowDown, "", http.StatusBadRequest)
-			} else {
-				s.tokenErrHelper(w, deviceTokenPending, "", http.StatusUnauthorized)
-			}
+			s.tokenErrHelper(w, deviceTokenPending, "", http.StatusUnauthorized)
 		case deviceTokenComplete:
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Length", strconv.Itoa(len(deviceToken.Token)))
 			w.Write([]byte(deviceToken.Token))
 		}
 	default:

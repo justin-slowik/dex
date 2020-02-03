@@ -24,6 +24,7 @@ const (
 	keysName             = "openid-connect-keys"
 	deviceRequestPrefix  = "device_req/"
 	deviceTokenPrefix    = "device_token/"
+	requestLimitPrefix   = "request_limit/"
 
 	// defaultStorageTimeout will be applied to all storage's operations.
 	defaultStorageTimeout = 5 * time.Second
@@ -104,6 +105,22 @@ func (c *conn) GarbageCollect(now time.Time) (result storage.GCResult, err error
 			result.DeviceTokens++
 		}
 	}
+
+	requestLimits, err := c.listRequestLimits(ctx)
+	if err != nil {
+		return result, err
+	}
+
+	for _, requestLimit := range requestLimits {
+		if now.After(requestLimit.Expiry) {
+			if err := c.deleteKey(ctx, keyID(requestLimitPrefix, requestLimit.Key)); err != nil {
+				c.logger.Errorf("failed to delete request limit %v", err)
+				delErr = fmt.Errorf("failed to delete request limit: %v", err)
+			}
+			result.RequestLimits++
+		}
+	}
+
 	return result, delErr
 }
 
@@ -636,4 +653,50 @@ func (c *conn) UpdateDeviceToken(deviceCode string, updater func(old storage.Dev
 		}
 		return json.Marshal(fromStorageDeviceToken(updated))
 	})
+}
+
+func (c *conn) CreateRequestLimit(r storage.RequestLimit) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
+	defer cancel()
+	return c.txnCreate(ctx, keyID(requestLimitPrefix, r.Key), fromStorageRequestLimit(r))
+}
+
+func (c *conn) GetRequestLimit(key string) (r storage.RequestLimit, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
+	defer cancel()
+	err = c.getKey(ctx, keyID(requestLimitPrefix, key), &r)
+	return r, err
+}
+
+func (c *conn) UpdateRequestLimit(key string, updater func(l storage.RequestLimit) (storage.RequestLimit, error)) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultStorageTimeout)
+	defer cancel()
+	return c.txnUpdate(ctx, keyID(requestLimitPrefix, key), func(currentValue []byte) ([]byte, error) {
+		var current RequestLimit
+		if len(currentValue) > 0 {
+			if err := json.Unmarshal(currentValue, &current); err != nil {
+				return nil, err
+			}
+		}
+		updated, err := updater(toStorageRequestLimit(current))
+		if err != nil {
+			return nil, err
+		}
+		return json.Marshal(fromStorageRequestLimit(updated))
+	})
+}
+
+func (c *conn) listRequestLimits(ctx context.Context) (requestLimits []RequestLimit, err error) {
+	res, err := c.db.Get(ctx, requestLimitPrefix, clientv3.WithPrefix())
+	if err != nil {
+		return requestLimits, err
+	}
+	for _, v := range res.Kvs {
+		var r RequestLimit
+		if err = json.Unmarshal(v.Value, &r); err != nil {
+			return requestLimits, err
+		}
+		requestLimits = append(requestLimits, r)
+	}
+	return requestLimits, nil
 }

@@ -250,22 +250,44 @@ type DeviceToken struct {
 
 func fromStorageDeviceToken(t storage.DeviceToken) DeviceToken {
 	return DeviceToken{
-		DeviceCode:          t.DeviceCode,
-		Status:              t.Status,
-		Token:               t.Token,
-		Expiry:              t.Expiry,
-		LastRequestTime:     t.LastRequestTime,
-		PollIntervalSeconds: t.PollIntervalSeconds,
+		DeviceCode: t.DeviceCode,
+		Status:     t.Status,
+		Token:      t.Token,
+		Expiry:     t.Expiry,
 	}
 }
 
 func toStorageDeviceToken(t DeviceToken) storage.DeviceToken {
 	return storage.DeviceToken{
-		DeviceCode:          t.DeviceCode,
-		Status:              t.Status,
-		Token:               t.Token,
-		Expiry:              t.Expiry,
-		LastRequestTime:     t.LastRequestTime,
-		PollIntervalSeconds: t.PollIntervalSeconds,
+		DeviceCode: t.DeviceCode,
+		Status:     t.Status,
+		Token:      t.Token,
+		Expiry:     t.Expiry,
+	}
+}
+
+// RequestLimit is a mirrored struct from storage with JSON struct tags
+type RequestLimit struct {
+	Key      string    `json:"key"`
+	Interval int       `json:"interval"`
+	LastSeen time.Time `json:"last_seen"`
+	Expiry   time.Time `json:"expiry"`
+}
+
+func fromStorageRequestLimit(r storage.RequestLimit) RequestLimit {
+	return RequestLimit{
+		Key:      r.Key,
+		Interval: r.Interval,
+		LastSeen: r.LastSeen,
+		Expiry:   r.Expiry,
+	}
+}
+
+func toStorageRequestLimit(r RequestLimit) storage.RequestLimit {
+	return storage.RequestLimit{
+		Key:      r.Key,
+		Interval: r.Interval,
+		LastSeen: r.LastSeen,
+		Expiry:   r.Expiry,
 	}
 }

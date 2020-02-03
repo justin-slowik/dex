@@ -224,9 +224,14 @@ var migrations = []migration{
 				device_code text not null primary key,
 				status text not null,
 				token text,
-				expiry timestamptz not null,
-				last_request timestamptz not null,
-                poll_interval integer not null
+				expiry timestamptz not null
+			);`,
+			`
+			create table request_limit (
+				request_key text not null primary key,
+				request_interval integer not null,
+				last_seen timestamptz not null,
+				expiry timestamptz not null
 			);`,
 		},
 	},

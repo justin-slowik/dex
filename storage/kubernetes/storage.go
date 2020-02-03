@@ -23,6 +23,7 @@ const (
 	kindConnector       = "Connector"
 	kindDeviceRequest   = "DeviceRequest"
 	kindDeviceToken     = "DeviceToken"
+	kindRequestLimit    = "RequestLimit"
 )
 
 const (
@@ -36,6 +37,7 @@ const (
 	resourceConnector       = "connectors"
 	resourceDeviceRequest   = "devicerequests"
 	resourceDeviceToken     = "devicetokens"
+	resourceRequestLimit    = "requestlimits"
 )
 
 // Config values for the Kubernetes storage type.
@@ -628,6 +630,21 @@ func (cli *client) GarbageCollect(now time.Time) (result storage.GCResult, err e
 		}
 	}
 
+	var requestLimits RequestLimitList
+	if err := cli.list(resourceRequestLimit, &requestLimits); err != nil {
+		return result, fmt.Errorf("failed to list request limits: %v", err)
+	}
+
+	for _, requestLimit := range requestLimits.RequestLimits {
+		if now.After(requestLimit.Expiry) {
+			if err := cli.delete(resourceRequestLimit, requestLimit.ObjectMeta.Name); err != nil {
+				cli.logger.Errorf("failed to delete request limit: %v", err)
+				delErr = fmt.Errorf("failed to delete request limit: %v", err)
+			}
+			result.RequestLimits++
+		}
+	}
+
 	if delErr != nil {
 		return result, delErr
 	}
@@ -677,4 +694,36 @@ func (cli *client) UpdateDeviceToken(deviceCode string, updater func(old storage
 	newToken := cli.fromStorageDeviceToken(updated)
 	newToken.ObjectMeta = r.ObjectMeta
 	return cli.put(resourceDeviceToken, r.ObjectMeta.Name, newToken)
+}
+
+func (cli *client) CreateRequestLimit(r storage.RequestLimit) error {
+	return cli.post(resourceRequestLimit, cli.fromStorageRequestLimit(r))
+}
+
+func (cli *client) GetRequestLimit(key string) (storage.RequestLimit, error) {
+	var limit RequestLimit
+	if err := cli.get(resourceRequestLimit, strings.ToLower(key), &limit); err != nil {
+		return storage.RequestLimit{}, err
+	}
+	return toStorageRequestLimit(limit), nil
+}
+
+func (cli *client) getRequestLimit(key string) (r RequestLimit, err error) {
+	err = cli.get(resourceRequestLimit, key, &r)
+	return
+}
+
+func (cli *client) UpdateRequestLimit(key string, updater func(old storage.RequestLimit) (storage.RequestLimit, error)) error {
+	r, err := cli.getRequestLimit(key)
+	if err != nil {
+		return err
+	}
+	updated, err := updater(toStorageRequestLimit(r))
+	if err != nil {
+		return err
+	}
+	updated.Key = key
+	newLimit := cli.fromStorageRequestLimit(updated)
+	newLimit.ObjectMeta = r.ObjectMeta
+	return cli.put(resourceRequestLimit, r.ObjectMeta.Name, newLimit)
 }

@@ -173,6 +173,21 @@ var customResourceDefinitions = []k8sapi.CustomResourceDefinition{
 			},
 		},
 	},
+	{
+		ObjectMeta: k8sapi.ObjectMeta{
+			Name: "requestlimits.dex.coreos.com",
+		},
+		TypeMeta: crdMeta,
+		Spec: k8sapi.CustomResourceDefinitionSpec{
+			Group:   apiGroup,
+			Version: "v1",
+			Names: k8sapi.CustomResourceDefinitionNames{
+				Plural:   "requestlimits",
+				Singular: "requestlimit",
+				Kind:     "RequestLimit",
+			},
+		},
+	},
 }
 
 // There will only ever be a single keys resource. Maintain this by setting a
@@ -681,7 +696,7 @@ type DeviceRequest struct {
 	Expiry       time.Time `json:"expiry"`
 }
 
-// AuthRequestList is a list of AuthRequests.
+// DeviceRequestList is a list of DeviceRequests.
 type DeviceRequestList struct {
 	k8sapi.TypeMeta `json:",inline"`
 	k8sapi.ListMeta `json:"metadata,omitempty"`
@@ -748,22 +763,62 @@ func (cli *client) fromStorageDeviceToken(t storage.DeviceToken) DeviceToken {
 			Name:      t.DeviceCode,
 			Namespace: cli.namespace,
 		},
-		Status:              t.Status,
-		Token:               t.Token,
-		Expiry:              t.Expiry,
-		LastRequestTime:     t.LastRequestTime,
-		PollIntervalSeconds: t.PollIntervalSeconds,
+		Status: t.Status,
+		Token:  t.Token,
+		Expiry: t.Expiry,
 	}
 	return req
 }
 
 func toStorageDeviceToken(t DeviceToken) storage.DeviceToken {
 	return storage.DeviceToken{
-		DeviceCode:          t.ObjectMeta.Name,
-		Status:              t.Status,
-		Token:               t.Token,
-		Expiry:              t.Expiry,
-		LastRequestTime:     t.LastRequestTime,
-		PollIntervalSeconds: t.PollIntervalSeconds,
+		DeviceCode: t.ObjectMeta.Name,
+		Status:     t.Status,
+		Token:      t.Token,
+		Expiry:     t.Expiry,
+	}
+}
+
+// RequestLimit is a mirrored struct from storage with JSON struct tags and
+// Kubernetes type metadata.
+type RequestLimit struct {
+	k8sapi.TypeMeta   `json:",inline"`
+	k8sapi.ObjectMeta `json:"metadata,omitempty"`
+
+	Interval int       `json:"interval,omitempty"`
+	LastSeen time.Time `json:"last_seen"`
+	Expiry   time.Time `json:"expiry"`
+}
+
+// RequestLimitList is a list of RequestLimits.
+type RequestLimitList struct {
+	k8sapi.TypeMeta `json:",inline"`
+	k8sapi.ListMeta `json:"metadata,omitempty"`
+	RequestLimits   []RequestLimit `json:"items"`
+}
+
+func (cli *client) fromStorageRequestLimit(r storage.RequestLimit) RequestLimit {
+	req := RequestLimit{
+		TypeMeta: k8sapi.TypeMeta{
+			Kind:       kindRequestLimit,
+			APIVersion: cli.apiVersion,
+		},
+		ObjectMeta: k8sapi.ObjectMeta{
+			Name:      strings.ToLower(r.Key),
+			Namespace: cli.namespace,
+		},
+		Interval: r.Interval,
+		LastSeen: r.LastSeen,
+		Expiry:   r.Expiry,
+	}
+	return req
+}
+
+func toStorageRequestLimit(r RequestLimit) storage.RequestLimit {
+	return storage.RequestLimit{
+		Key:      strings.ToUpper(r.ObjectMeta.Name),
+		Interval: r.Interval,
+		LastSeen: r.LastSeen,
+		Expiry:   r.Expiry,
 	}
 }
