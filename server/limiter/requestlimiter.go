@@ -81,15 +81,15 @@ func (l *RequestLimiter) GetLastRequest(key string) (storage.RequestLimit, error
 
 // UpdateRequest updates the storage option with the newest request.
 func (l *RequestLimiter) UpdateRequest(req storage.RequestLimit) error {
-	updater := func(old storage.RequestLimit) (storage.RequestLimit, error) {
-		if l.IsLimited(old) && l.backoff {
-			old.Interval = old.Interval + int(l.baseRequestInterval.Seconds())
+	updater := func(limit storage.RequestLimit) (storage.RequestLimit, error) {
+		if l.IsLimited(limit) && l.backoff {
+			limit.Interval = limit.Interval + int(l.baseRequestInterval.Seconds())
 		} else {
-			old.Interval = int(l.baseRequestInterval.Seconds())
+			limit.Interval = int(l.baseRequestInterval.Seconds())
 		}
-		old.LastSeen = l.now()
-		old.Expiry = l.now().Add(l.defaultExpireTime)
-		return old, nil
+		limit.LastSeen = l.now()
+		limit.Expiry = l.now().Add(l.defaultExpireTime)
+		return limit, nil
 	}
 	if err := l.store.UpdateRequestLimit(req.Key, updater); err != nil {
 		l.logger.Errorf("failed to update device token: %v", err)
@@ -98,7 +98,7 @@ func (l *RequestLimiter) UpdateRequest(req storage.RequestLimit) error {
 	return nil
 }
 
-// IsLimited returns true if the given the current time is before the LastSeen time plus the defined interval
+// IsLimited returns true if the current time is before the LastSeen time plus the defined interval
 func (l *RequestLimiter) IsLimited(r storage.RequestLimit) bool {
 	d := time.Duration(r.Interval) * time.Second
 	return l.now().Before(r.LastSeen.Add(d))

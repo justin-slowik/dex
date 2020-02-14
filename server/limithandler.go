@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dexidp/dex/server/limiter"
@@ -11,8 +12,9 @@ import (
 )
 
 // setResponseHeaders configures X-Rate-Limit-Limit and X-Rate-Limit-Duration
-func setResponseHeaders(lmt *limiter.RequestLimiter, w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("X-Rate-Limit-Duration", "1")
+func setResponseHeaders(limit storage.RequestLimit, w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("X-Rate-Limit-Limit", "1")
+	w.Header().Add("X-Rate-Limit-Duration", fmt.Sprintf("%.2d", limit.Interval))
 	w.Header().Add("X-Rate-Limit-Request-Forwarded-For", r.Header.Get("X-Forwarded-For"))
 	w.Header().Add("X-Rate-Limit-Request-Remote-Addr", r.RemoteAddr)
 }
@@ -25,7 +27,6 @@ func (s *Server) NewLimiter(requestInterval time.Duration, expireInterval time.D
 // LimitByRequest generates a key based on the request IP, path, and method, and gets the RequestLimit object if one
 // exists, or generates a new one
 func LimitByRequest(lmt *limiter.RequestLimiter, w http.ResponseWriter, r *http.Request) (storage.RequestLimit, error) {
-	setResponseHeaders(lmt, w, r)
 	remoteIP := GetIP(r)
 	path := r.URL.Path
 	method := r.Method
@@ -49,6 +50,7 @@ func (s *Server) RequestLimitHandler(lmt *limiter.RequestLimiter, next http.Hand
 			s.renderError(r, w, http.StatusInternalServerError, "")
 			return
 		}
+		setResponseHeaders(req, w, r)
 		if lmt.IsLimited(req) {
 			lmt.ExecOnLimitReached(w, r, req.Interval)
 			return
